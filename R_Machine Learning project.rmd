@@ -1,0 +1,196 @@
+---
+title: "Assignment-1 "
+author: "Drasti Shah"
+output:
+  word_document: 
+    reference_docx: word_refernence.docx
+---
+-----------
+<br>
+<br>
+
+# Background
+<br>
+Home loans are a necessity these days and the to be eligible for one you need to satisfy a number of factors. This dataset outlines the various factors on which loan eligibility is dependent to automate the process. I will be using this dataset (source: [Loan eligibility dataset] (https://www.kaggle.com/vikasukani/loan-eligible-dataset)) to analyze what factors help predict the eligibility of an individual to get a loan. Firstly, we will check if gender plays any role in the loan eligibility process [1]. However, it is not the only parameter to be considered [1]. Secondly,  [2]. We will check the impact of being married on loan eligibility. We then check the self - employed status in [3] because it is very important to guarantee the timely pay back of a loan. [4] puts light on the Applicant's Income which is an important factor to considered to decide upon the loan amount to be sanctioned. Co - applicant Income is another factor to be considered since this is also a guarantor of timely and complete payment of loan amount  [5]. The next parameter is the Loan amount for which the customer is eligible [6]. Consequently, the term after which the loan is due is also to be considered [7]. Credit History is one of the most important parameters to determine whether a person should be given the loan because it showcases the past entire record of the payments made by the consumer [7]. Property Area mentions the location of the house for which a particular loan amount is requested [8].Creating a model which predicts your eligibility for any given loan amount eases the process for both the customer and the bank. In Addition, it sets a criteria to become eligible for the loan too.
+
+```{r,echo=FALSE,warning=FALSE,results=FALSE,message=FALSE}
+# Importing the library
+library(knitr)
+library(tidyverse)
+library(rstatix)
+library(caTools)
+library(pROC)
+```
+
+
+```{r,echo=FALSE,warning=FALSE,results=FALSE,message=FALSE}
+# Importing data
+loan_data <- read.csv('loan-train.csv', na.strings = c(""))
+```
+
+
+# Data Description
+```{r,echo=FALSE,warning=FALSE,include=FALSE}
+str(loan_data)
+# Using the str function to get a glance of data attributes and associated data types
+```
+
+
+```{r,echo=FALSE, warning=FALSE, include=FALSE}
+# checking for missing data in the dataset
+sapply(loan_data,function(x) sum(is.na(x)))
+# we found out that there are no missing values.
+
+# We will remove missing data from our dataset
+# using na.omit to remove missing values from the dataset
+loan_data <- na.omit(loan_data)
+
+# we will also check for the number of unique value in the column
+sapply(loan_data, function(x) length(unique(x)))
+# from this we can get an idea of categorical variables existing in the dataset
+```
+
+
+```{r,echo=FALSE,warning=FALSE, include=FALSE}
+# As noticed earlier that there are few data attributes which are categorical, so we will convert them into factor variables.
+# using factor function to create factor variables for categorical data
+loan_data$Gender <- factor(loan_data$Gender)
+loan_data$Married <- factor(loan_data$Married)
+loan_data$Education <- factor(loan_data$Education)
+loan_data$Self_Employed <- factor(loan_data$Self_Employed)
+loan_data$Property_Area <- factor(loan_data$Property_Area)
+loan_data$Loan_Status <- factor(loan_data$Loan_Status)
+str(loan_data)
+```
+
+```{r,echo=FALSE,warning=FALSE}
+Attributes <- names(loan_data)
+Definition <- c("An identification number which helps in uniquely identifying to every loan", "Gender of every individual","Marital status of the individual", "The number of dependents each individual has", "Tells if individual is graduate or not","Gives information about the employment status", "Mentions the income of an applicant", "Mentions the income of a co-applicant","The amount of loan disbursed", "The term for which a loan amount is disbursed", "The credit history of the applicant", "The area in which the property is bought","Loan status showing whether the individual has recieved it or not")
+Data_Type <- c("chr", "Factor", "Factor","chr", "Factor", "Factor", "int","num", "int", "int","int", "Factor", "Factor")
+dataframe <- data.frame(Attributes, Definition, Data_Type)
+kable(dataframe, align = "llr") # Create the table
+```
+<br>
+The Loan eligibility dataset has 13 attributes. In this dataset, the Loan_Status attribute is the dependent variable. The dataset has no missing values but has some incorrect data types. Categorical data with incorrect data types were also factorized using R's factor function. The dependent variable Loan_Status is a 1/2 value, which defines if an individual gets loan or not. The Loan_ID states a unique ID to identify each individual's loan. The Gender variable states whether the person is a male or female. The Married attribute provides information about the marital status of an individual. The dependents attribute mentions the number of dependents. The education attribute points out if the individual is graduate or not. The Self_Employed shows the status of a person's occupation. The Applicant Income tells you the income of an applicant. The Coapplicant Income mentions the income of any co-applicant. The Loan Amount tells you the total amount of loan which was applied for. The Loan_Amount_Term mentions the total days for which loan is sanctioned. The Credit_History states whether the history is good or not. The Property_Area mentions the location at which the property was bought (Urban, Semiurban, Rural). All of these variables will help in predicting the probability of the Loan_Status of an individual.
+
+
+# Method
+<br>
+```{r,echo=TRUE,warning=FALSE,results=FALSE}
+# removing loan_id column as it's irrelevant for the model
+loan_data <- loan_data[-1]
+```
+
+```{r,echo=TRUE,warning=FALSE,results=FALSE}
+# splitting the dataset into training set and test set
+set.seed(123)
+split = sample.split(loan_data$Loan_Status, SplitRatio = 0.30)
+training_set = subset(loan_data, split == FALSE)
+test_set = subset(loan_data, split == TRUE)
+```
+
+```{r,echo=TRUE,warning=FALSE,results=FALSE}
+# training the logistic regression model on the training_set
+# . operator in the formula uses all the columns expect the is_promoted to fit the logistic regression model
+classifier = glm(formula = Loan_Status ~ .,
+                 family = binomial,
+                 data = training_set)
+summary(classifier)
+```
+
+```{r,echo=TRUE,warning=FALSE,results=FALSE}
+# training the logistic regression model on the training_set
+# removed the gender & recruitment_channel variable which turned out to be less significant for the model to predict value of is_promoted.
+classifier_2 = glm(formula = Loan_Status ~ Gender + Married + Credit_History + CoapplicantIncome+ Property_Area + Loan_Status,
+                 family = binomial,
+                 data = training_set)
+summary(classifier_2)
+```
+```{r,echo=TRUE,warning=FALSE,results=FALSE}
+# comparing both the models
+anova(classifier, classifier_2, test = 'LR')
+```
+
+```{r,echo=TRUE,warning=FALSE,include=FALSE,results=FALSE}
+# Predicting the Test set results
+prob_pred = predict(classifier, type = 'response', newdata = test_set[-12])
+# converting the probabilities to actual 0/1 values
+# setting decision boundary to 0.5
+y_pred = ifelse(prob_pred > 0.5, 1, 0)
+
+```
+
+```{r,echo=TRUE,warning=FALSE,results=FALSE}
+# Creating the Confusion Matrix
+cm = table(test_set[, 12], y_pred)
+cm
+```
+
+```{r,echo=TRUE,warning=FALSE,results=FALSE}
+# calculating the accuracy of the model
+n = sum(cm) # total number of instances in the confusion matrix
+diag = diag(cm) # number of correctly classified instances in the confusion matrix
+accuracy = sum(diag) / n 
+accuracy*100 # multiplying by 100 to get percentage value
+```
+<br>
+At this stage, we began with data pre-processing. We removed the Loan_id variable from the data frame, as it was irrelevant the model building. In the next step, we split the dataset into two parts: a training set and a test set. 70% of the data was stored in the training set, while the remaining 30% was stored in the test set. We chose the logistic regression model for creating a predictive model for the dataset. The model was built using the backward elimination approach; The base model was created by passing everything in the glm() function and, the results of the model were analyzed using the summary function. We found a few insignificant variables in the model (Dependents, Education, Self_Employed, ApplicantIncome, LoanAmount, Loan_Amount_Term and Credit_History). These variables were removed while creating the second model. However, when we used anova test to compare both the models, we got a p-value of 0.7865 for the second model, which is enough to prove that the base model was a better fit. So we went ahead by choosing the base model as the final model. We used the predict function to predict the probability for the test data. We also set the decision boundary as 0.5. So probability > 0.5 will be set to 1 else 0. We also created a confusion matrix, which will display a matrix of correct and incorrect (True positives, False positives, True negatives, and False negatives) predictions performed by the model. At last, we calculated the accuracy of the model.
+
+# Result
+
+* Model summary of the base model to know the significant variables 
+```{r,echo=FALSE,warning=FALSE,results=TRUE,include=TRUE}
+summary(classifier)
+```
+
+* Model summary of the 2nd model
+```{r,echo=FALSE,warning=FALSE,results=TRUE,include=TRUE}
+summary(classifier_2)
+```
+<br>
+
+* Anova test results comparing the base model and the updated model
+```{r,echo=FALSE,warning=FALSE,results=TRUE,include=TRUE}
+# comparing both the models
+kable(anova(classifier, classifier_2, test = 'LR'))
+```
+<br>
+
+* Confusion matrix
+```{r,echo=FALSE,warning=FALSE,results=TRUE,include=TRUE}
+# Creating the Confusion Matrix
+kable(cm)
+```
+<br>
+
+* Accuracy of the model
+```{r,echo=FALSE,warning=FALSE,results=TRUE,include=TRUE}
+# calculating the accuracy of the model
+accuracy*100 # multiplying by 100 to get percentage value
+```
+<br>
+
+* Plotting the roc curve
+```{r,echo=FALSE,warning=TRUE,results=TRUE,include=TRUE}
+test_roc = roc(test_set$Loan_Status ~ prob_pred, plot = TRUE, print.auc = TRUE, asp = 1)
+```
+<br>
+
+In the result section, we have provided the results of the method section. To start with, from the summary of the model, we can depict that Gender, Married, Credit_History, CoapplicantIncome, Property_Area are the significant variables impacting the eligibility of any loan. After that, the anova test result helped us in choosing the correct model. The confusion matrix table shows us the number of correct & incorrect predictions (True Positives = 97, True Negatives = 26, False Positives = 3, False Negatives = 18). We have also included the result of the accuracy of the model calculated in the method section. In the end, we have included a ROC curve. A ROC curve (receiver operating characteristic curve) is a graph showing the performance of a classification model at all classification thresholds. We have got an AUC of 0.707. AUC ranges in value from 0 to 1. A model whose predictions are 100% wrong has an AUC of 0.0; one whose predictions are 100% correct has an AUC of 1.0. The value of AUC states that we have created a good model.
+
+
+# Conclusion
+<br>
+In this study, we performed analysis on a real-world dataset. The dataset was based on Loan Eligibility data. It had a total of 13 attributes. We were supposed to find out the attributes which influenced the eligibility of an  individual for a loan. We also made some hypotheses based on past researches and tried to examine those in our dataset. We started by exploring the dataset and managed to find some discrepancies in the data which we solved later. We also provided a table with a high-level data description, for the user to get an idea of the dataset. After this, we went on to the modeling part. We followed the conventional approach of splitting the dataset into training and test set. We implemented the logistic regression algorithm. The model was trained using the training data. We used the backward elimination approach and removed insignificant variables in the updated model. However, the anova test suggested that the base model was more efficient. Summary data of the model helped in concluding the hypothesis. Factors including Gender, Married, Credit_History, CoapplicantIncome, Property_Area turned out to be significant for getting a loan. Once the model was ready, we started predicting the value of Loan_status for the test data. The probability with value > 0.5 were set to 1 else 0. The confusion matrix helped us in comparing the predicted values with the actual values; This way we can have an idea of how many correct/incorrect predictions were made by the model. We then visualized the ROC curve(receiver operating characteristic curve) which helped us in showing the performance of a classification model at all classification thresholds. We got an AUC of 0.707. The value of AUC suggested that we have created a good model.
+
+
+# References
+1. Holvoet, Nathalie. "Impact of microfinance programs on children's education: Do the gender of the borrower and the delivery model matter?." Journal of Microfinance/ESR Review 6.2 (2004): 3., https://scholarsarchive.byu.edu/esr/vol6/iss2/3/
+
+2. Sooryamoorthy, R. "Microfinance and women in Kerala: Is marital status a determinant in savings and credit-use?." Sociological bulletin 54.1 (2005): 59-77., https://journals.sagepub.com/doi/abs/10.1177/0038022920050104?journalCode=soba
+
+3. Ghosh, Souvik. "„Housing Finance in India and Appraisal Process of Home Loans with Specific reference to Indian Overseas Bank‟." International Journal of Science and Research 3.8 (2014): 129-135., https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.567.4065&rep=rep1&type=pdf
+
+4. Al-qerem, Ahmad, Ghazi Al-Naymat, and Mays Alhasan. "Loan Default Prediction Model Improvement through Comprehensive Preprocessing and Features Selection." 2019 International Arab Conference on Information Technology (ACIT). IEEE, 2019., https://ieeexplore.ieee.org/abstract/document/8991084
+
+5. Kumar, Ashwani, Raman Dugyala, and Pronaya Bhattacharya. "Prediction of Loan Scoring Strategies Using Deep Learning Algorithm for Banking System." Innovations in Information and Communication Technologies (IICT-2020). Springer, Cham, 2021. 115-121., https://link.springer.com/chapter/10.1007/978-3-030-66218-9_13
